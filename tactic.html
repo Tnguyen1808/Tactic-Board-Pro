@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tactical Board Pro v5.6 | Full 11-a-side</title>
+    <style>
+        :root {
+            --primary: #00f2fe;
+            --accent: #4facfe;
+            --bg-dark: #0a0b10;
+            --panel-bg: rgba(255, 255, 255, 0.05);
+            --glass: rgba(10, 11, 16, 0.95);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #e0e0e0;
+            --pitch-bg: #112a18;
+            --home-team: linear-gradient(135deg, #ff416c, #ff4b2b);
+            --away-team: linear-gradient(135deg, #4facfe, #00f2fe);
+            --danger: #ff4b2b;
+        }
+
+        [data-theme="light"] {
+            --bg-dark: #f0f2f5;
+            --panel-bg: rgba(0, 0, 0, 0.05);
+            --glass: rgba(255, 255, 255, 0.95);
+            --border: rgba(0, 0, 0, 0.1);
+            --text: #1a1a1a;
+            --pitch-bg: #2d5a27;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        /* Sidebars */
+        .sidebar, .right-bar {
+            width: 280px;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            padding: 30px 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .sidebar { border-right: 1px solid var(--border); }
+        .right-bar { border-left: 1px solid var(--border); }
+
+        .sidebar.hidden { transform: translateX(-100%); position: absolute; }
+        .right-bar.hidden { transform: translateX(100%); position: absolute; right: 0; }
+
+        .menu-toggle {
+            position: absolute; top: 20px;
+            width: 40px; height: 40px; background: var(--glass);
+            border: 1px solid var(--border); color: var(--primary);
+            cursor: pointer; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px; z-index: 1100;
+        }
+        .left-toggle { right: -45px; border-radius: 0 8px 8px 0; }
+        .right-toggle { left: -45px; border-radius: 8px 0 0 8px; }
+
+        h2 { 
+            font-size: 14px; color: var(--primary); margin: 0; 
+            letter-spacing: 2px; font-weight: 800; text-transform: uppercase;
+        }
+
+        .group { display: flex; flex-direction: column; gap: 8px; }
+        .label { font-size: 10px; opacity: 0.5; font-weight: 800; text-transform: uppercase; letter-spacing: 1.5px; }
+
+        button {
+            padding: 12px; background: var(--panel-bg); color: var(--text);
+            border: 1px solid var(--border); border-radius: 10px;
+            cursor: pointer; text-align: left; transition: 0.3s;
+            font-weight: 600; font-size: 13px;
+        }
+        
+        button:hover { background: rgba(128,128,128,0.15); border-color: var(--primary); }
+
+        /* Style cho nút đang được chọn */
+        button.active-btn { 
+            background: var(--primary);
+            color: #000;
+            border-color: var(--primary);
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+        }
+
+        /* Workspace */
+        .workspace { flex-grow: 1; position: relative; background: #000; overflow: hidden; }
+        .pitch-container { position: absolute; transform-origin: 0 0; }
+        
+        .pitch {
+            position: relative; width: 1000px; height: 650px;
+            background: var(--pitch-bg); border: 4px solid rgba(255,255,255,0.7);
+            background-image: 
+                linear-gradient(90deg, rgba(255,255,255,0.02) 50%, transparent 50%),
+                repeating-linear-gradient(90deg, transparent, transparent 80px, rgba(0,0,0,0.05) 80px, rgba(0,0,0,0.05) 160px);
+            background-size: 20px 20px, 160px 100%;
+        }
+
+        /* Players & Ball */
+        .player, .ball {
+            width: 40px; height: 40px; border-radius: 50%;
+            position: absolute; display: flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 900; cursor: grab; z-index: 20;
+            border: 2px solid #fff; box-shadow: 0 5px 10px rgba(0,0,0,0.3);
+            transform: translate(-50%, -50%);
+            transition: none; /* Tắt transition khi kéo để mượt hơn */
+        }
+        .home { background: var(--home-team); color: white; }
+        .away { background: var(--away-team); color: #000; }
+        .ball { width: 26px; height: 26px; background: #fff; color: #000; font-size: 14px; border: 2px solid #333; }
+
+        canvas { position: absolute; top: 0; left: 0; z-index: 10; pointer-events: none; }
+        canvas.active { pointer-events: auto; cursor: crosshair; }
+
+        #tacticList { flex-grow: 1; overflow-y: auto; }
+        .tactic-slot {
+            background: var(--panel-bg); padding: 12px;
+            border-radius: 10px; display: flex; justify-content: space-between;
+            margin-bottom: 8px; border: 1px solid var(--border);
+            cursor: pointer; font-size: 13px;
+        }
+        .theme-switch { display: flex; gap: 5px; background: var(--panel-bg); padding: 5px; border-radius: 12px; }
+        .theme-switch button { flex: 1; text-align: center; padding: 8px; border: none; }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <div class="sidebar" id="sidebar">
+        <button class="menu-toggle left-toggle" onclick="toggleSidebar('sidebar')">☰</button>
+        <h2>PRO TACTICS</h2>
+        
+        <div class="group">
+            <div class="label">Appearance</div>
+            <div class="theme-switch">
+                <button id="btn-dark" class="active-btn" onclick="setTheme('dark')">🌙 Dark</button>
+                <button id="btn-light" onclick="setTheme('light')">☀️ Light</button>
+            </div>
+        </div>
+
+        <div class="group">
+            <div class="label">Formation</div>
+            <button onclick="initFormation(5, this)" id="form-5">5-a-side</button>
+            <button onclick="initFormation(7, this)" id="form-7">7-a-side</button>
+            <button onclick="initFormation(11, this)" id="form-11" class="active-btn">11-a-side</button>
+        </div>
+
+        <div class="group">
+            <div class="label">Tools</div>
+            <button onclick="setTool('pen', this)" id="pen-btn">✏️ Draw Movement</button>
+            <button onclick="clearCanvas()" style="color: var(--danger)">🗑️ Clear Lines</button>
+        </div>
+
+        <button onclick="hardReset()" style="margin-top: auto; font-size: 11px; opacity: 0.6; text-align: center;">🔄 Hard Reset App</button>
+    </div>
+
+    <div class="workspace" id="workspace">
+        <div class="pitch-container" id="pitchContainer">
+            <div class="pitch" id="pitch">
+                <div class="center-line" style="position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,0.3);"></div>
+                <div class="center-circle" style="position: absolute; top: 50%; left: 50%; width: 150px; height: 150px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; transform: translate(-50%, -50%);"></div>
+                <canvas id="canvas"></canvas>
+                <div id="ball" class="ball">⚽</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="right-bar" id="rightbar">
+        <button class="menu-toggle right-toggle" onclick="toggleSidebar('rightbar')">📋</button>
+        <h2>STRATEGY</h2>
+        <div class="label">Saved Library</div>
+        <div id="tacticList"></div>
+        <button onclick="saveCurrentTactic()" style="background: var(--primary); color: #000; text-align: center; border: none; font-weight: 800; margin-top: auto;">💾 SAVE STRATEGY</button>
+    </div>
+
+    <script>
+        const container = document.getElementById('pitchContainer');
+        const pitch = document.getElementById('pitch');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const tacticList = document.getElementById('tacticList');
+        const ball = document.getElementById('ball');
+
+        let scale = 0.8, posX = 100, posY = 60;
+        let isPanning = false, startX, startY;
+        let currentTool = 'none', isDrawing = false;
+        let savedTactics = JSON.parse(localStorage.getItem('pro_tactics_v55')) || [];
+
+        function setTheme(theme) {
+            document.body.setAttribute('data-theme', theme);
+            document.getElementById('btn-dark').classList.toggle('active-btn', theme === 'dark');
+            document.getElementById('btn-light').classList.toggle('active-btn', theme === 'light');
+            localStorage.setItem('tactic_theme', theme);
+        }
+
+        function toggleSidebar(id) { document.getElementById(id).classList.toggle('hidden'); }
+
+        // CAMERA
+        document.getElementById('workspace').onwheel = e => {
+            e.preventDefault();
+            scale = Math.min(Math.max(0.2, scale + (e.deltaY > 0 ? -0.05 : 0.05)), 2.5);
+            updateTransform();
+        };
+
+        document.getElementById('workspace').onmousedown = e => {
+            if (e.button === 2 || e.button === 1) { isPanning = true; startX = e.clientX - posX; startY = e.clientY - posY; }
+        };
+        window.onmousemove = e => { if (isPanning) { posX = e.clientX - startX; posY = e.clientY - startY; updateTransform(); } };
+        window.onmouseup = () => isPanning = false;
+
+        function updateTransform() { container.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`; }
+
+        // PLAYER LOGIC
+        function createPlayer(label, team, l, t) {
+            const p = document.createElement('div');
+            p.className = `player ${team}`;
+            p.innerText = label;
+            p.style.left = l; p.style.top = t;
+            p.ondblclick = () => { const n = prompt("Name/No:", p.innerText); if(n) p.innerText = n; };
+            makeDraggable(p);
+            pitch.appendChild(p);
+        }
+
+        function makeDraggable(el) {
+            el.onmousedown = e => {
+                if(currentTool !== 'none' || e.button !== 0) return;
+                e.stopPropagation();
+                const rect = pitch.getBoundingClientRect();
+                const move = (me) => {
+                    el.style.left = ((me.clientX - rect.left) / scale) + 'px';
+                    el.style.top = ((me.clientY - rect.top) / scale) + 'px';
+                };
+                const stop = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', stop); };
+                document.addEventListener('mousemove', move);
+                document.addEventListener('mouseup', stop);
+            };
+        }
+
+        // FORMATIONS
+        function initFormation(size, btn) {
+            // Cập nhật trạng thái nút
+            document.querySelectorAll('.group button').forEach(b => b.classList.remove('active-btn'));
+            if(btn) btn.classList.add('active-btn');
+            else document.getElementById('form-' + size).classList.add('active-btn');
+
+            document.querySelectorAll('.player').forEach(p => p.remove());
+            
+            const data = {
+                5: [
+                    {t:'50%',l:'8%',lb:'GK'}, {t:'25%',l:'25%',lb:'D'}, {t:'75%',l:'25%',lb:'D'}, 
+                    {t:'50%',l:'42%',lb:'M'}, {t:'50%',l:'55%',lb:'F'}
+                ],
+                7: [
+                    {t:'50%',l:'7%',lb:'GK'}, {t:'20%',l:'22%',lb:'LD'}, {t:'80%',l:'22%',lb:'RD'},
+                    {t:'50%',l:'38%',lb:'CM'}, {t:'20%',l:'48%',lb:'LW'}, {t:'80%',l:'48%',lb:'RW'}, {t:'50%',l:'58%',lb:'ST'}
+                ],
+                11: [
+                    {t:'50%',l:'6%',lb:'GK'}, // Thủ môn
+                    {t:'15%',l:'20%',lb:'LB'}, {t:'40%',l:'18%',lb:'CB'}, {t:'60%',l:'18%',lb:'CB'}, {t:'85%',l:'20%',lb:'RB'}, // Hậu vệ
+                    {t:'35%',l:'35%',lb:'CDM'}, {t:'65%',l:'35%',lb:'CDM'}, // Tiền vệ phòng ngự
+                    {t:'50%',l:'48%',lb:'CAM'}, // Tiền vệ công
+                    {t:'20%',l:'52%',lb:'LW'}, {t:'80%',l:'52%',lb:'RW'}, // Cánh
+                    {t:'50%',l:'60%',lb:'ST'} // Tiền đạo
+                ]
+            };
+
+            data[size].forEach(p => {
+                createPlayer(p.lb, 'home', p.l, p.t);
+                createPlayer(p.lb, 'away', (100 - parseFloat(p.l)) + '%', p.t);
+            });
+            ball.style.left = '50%'; ball.style.top = '50%';
+        }
+
+        // DRAWING
+        function setTool(tool, btn) {
+            currentTool = (currentTool === tool) ? 'none' : tool;
+            btn.classList.toggle('active-btn', currentTool !== 'none');
+            canvas.className = currentTool !== 'none' ? 'active' : '';
+            canvas.width = 1000; canvas.height = 650;
+        }
+
+        canvas.onmousedown = e => { if(currentTool==='none')return; isDrawing = true; ctx.beginPath(); ctx.moveTo(e.offsetX, e.offsetY); };
+        canvas.onmousemove = e => { 
+            if(!isDrawing) return; 
+            ctx.strokeStyle = document.body.getAttribute('data-theme') === 'light' ? '#000' : '#fff'; 
+            ctx.lineWidth = 3; ctx.lineTo(e.offsetX, e.offsetY); ctx.stroke(); 
+        };
+        window.onmouseup = () => isDrawing = false;
+        function clearCanvas() { ctx.clearRect(0,0,canvas.width,canvas.height); }
+
+        // STRATEGY STORAGE
+        function saveCurrentTactic() {
+            const name = prompt("Tên chiến thuật:");
+            if(!name) return;
+            const pos = [];
+            document.querySelectorAll('.player').forEach(p => pos.push({l:p.style.left, t:p.style.top, text:p.innerText, team:p.classList.contains('home')?'home':'away'}));
+            savedTactics.push({name, pos, ball:{l:ball.style.left, t:ball.style.top}});
+            localStorage.setItem('pro_tactics_v55', JSON.stringify(savedTactics));
+            renderList();
+        }
+
+        function renderList() {
+            tacticList.innerHTML = '';
+            savedTactics.forEach((t, i) => {
+                const item = document.createElement('div');
+                item.className = 'tactic-slot';
+                item.innerHTML = `<span>📍 ${t.name}</span><span style="color:red" onclick="deleteTactic(${i})">×</span>`;
+                item.onclick = (e) => { if(e.target.tagName !== 'SPAN' || !e.target.onclick) loadTactic(i); };
+                tacticList.appendChild(item);
+            });
+        }
+
+        function loadTactic(i) {
+            const t = savedTactics[i];
+            document.querySelectorAll('.player').forEach(p => p.remove());
+            t.pos.forEach(p => createPlayer(p.text, p.team, p.l, p.t));
+            ball.style.left = t.ball.l; ball.style.top = t.ball.t;
+        }
+
+        function deleteTactic(i) { savedTactics.splice(i, 1); localStorage.setItem('pro_tactics_v55', JSON.stringify(savedTactics)); renderList(); }
+        function hardReset() { if(confirm("Xóa toàn bộ dữ liệu?")) { localStorage.clear(); location.reload(); } }
+
+        window.onload = () => {
+            const savedTheme = localStorage.getItem('tactic_theme') || 'dark';
+            setTheme(savedTheme);
+            initFormation(11); // Mặc định vào sân 11
+            renderList();
+            updateTransform();
+            makeDraggable(ball);
+        };
+    </script>
+</body>
+</html>
